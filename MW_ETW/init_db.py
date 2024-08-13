@@ -4,7 +4,6 @@ def initialize_database():
     conn = sqlite3.connect('votes.db')
     c = conn.cursor()
 
-    # Créer la table votes
     c.execute('''
         CREATE TABLE IF NOT EXISTS votes (
             name TEXT PRIMARY KEY,
@@ -12,7 +11,6 @@ def initialize_database():
         )
     ''')
 
-    # Créer la table user_votes
     c.execute('''
         CREATE TABLE IF NOT EXISTS user_votes (
             user_id TEXT NOT NULL,
