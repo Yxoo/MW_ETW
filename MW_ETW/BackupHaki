@@ -1,0 +1,368 @@
+local player = game.Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
+local humanoid = character:WaitForChild("Humanoid")
+local userInputService = game:GetService("UserInputService")
+local humanoidRootPart = character:WaitForChild("HumanoidRootPart")
+local tweenService = game:GetService("TweenService")
+
+local animations = {
+	PushUp = "89781564914279",
+	OneArmPushUp = "113817629349291"
+}
+
+local function loadAnimation(animationId)
+	local animation = Instance.new("Animation")
+	animation.AnimationId = "rbxassetid://" .. animationId
+	return humanoid:LoadAnimation(animation)
+end
+
+local loadedAnimations = {
+	PushUp = loadAnimation(animations.PushUp),
+	OneArmPushUp = loadAnimation(animations.OneArmPushUp)
+}
+
+local animationActive = false
+local pushUpPos = false
+local pumpCount = 0
+local PlayerScale = 0.7
+local randomPumps = math.random(3, 5)
+local currentAnimationTrack = nil
+
+local PlayerSize = player:WaitForChild("leaderstats").Size.Value
+local PlayerMaxSize = player:WaitForChild("PlayerStats").MaxSize.Value
+local PlayerMultiplier = player:WaitForChild("PlayerStats").Multiplier.Value
+local PlayerWalkSpeed = player:WaitForChild("PlayerStats").WalkSpeed.Value
+local PlayerTrainingSpeed = player:WaitForChild("PlayerStats").TrainingSpeed.Value
+
+local screenGui = Instance.new("ScreenGui", player.PlayerGui)
+
+local function createTextLabelWithBorder(text)
+	local borderLabel = Instance.new("TextLabel", screenGui)
+	borderLabel.Size = UDim2.new(0.21, 0, 0.11, 0)
+	borderLabel.Position = UDim2.new(0.4, math.random(-50, 50), 0.1, math.random(100, 300))
+	borderLabel.Rotation = -30
+	borderLabel.BackgroundTransparency = 1
+	borderLabel.TextTransparency = 1
+	borderLabel.TextScaled = true
+	borderLabel.Font = Enum.Font.FredokaOne
+	borderLabel.TextColor3 = Color3.fromRGB(0, 0, 0)
+	borderLabel.Text = text
+
+	local textLabel = Instance.new("TextLabel", screenGui)
+	textLabel.Size = UDim2.new(0.2, 0, 0.1, 0)
+	textLabel.Position = borderLabel.Position
+	textLabel.Rotation = -30
+	textLabel.BackgroundTransparency = 1
+	textLabel.TextTransparency = 1
+	textLabel.TextScaled = true
+	textLabel.Font = Enum.Font.FredokaOne
+	textLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+	textLabel.Text = text
+
+	return borderLabel, textLabel
+end
+
+local function formatWithCommas(number)
+	local formatted = tostring(number)
+	formatted = formatted:reverse():gsub("(%d%d%d)", "%1,"):reverse()
+	if formatted:sub(1,1) == "," then
+		formatted = formatted:sub(2)
+	end
+	return formatted
+end
+
+local screenGui = Instance.new("ScreenGui", player.PlayerGui)
+
+local progressBarBackground = Instance.new("TextButton", screenGui)
+progressBarBackground.Size = UDim2.new(0.8, 0, 0.07, 0)
+progressBarBackground.Position = UDim2.new(0.1, 0, 0.9, 0)
+progressBarBackground.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+progressBarBackground.BorderSizePixel = 0
+progressBarBackground.AutoButtonColor = false
+progressBarBackground.Text = ""
+
+local borderFrame = Instance.new("Frame", progressBarBackground)
+borderFrame.Size = UDim2.new(1, 4, 1, 4)
+borderFrame.Position = UDim2.new(-0.02, 0, -0.02, 0)
+borderFrame.BackgroundColor3 = Color3.fromRGB(65, 65, 65)
+borderFrame.BorderSizePixel = 0
+borderFrame.ZIndex = 0
+
+local progressBar = Instance.new("Frame", progressBarBackground)
+progressBar.Size = UDim2.new(0, 0, 1, 0)
+progressBar.Position = UDim2.new(0, 0, 0, 0)
+progressBar.BackgroundColor3 = Color3.fromRGB(0, 255, 0)
+progressBar.BorderSizePixel = 2
+progressBar.BorderColor3 = Color3.fromRGB(47, 28, 255)
+
+local progressBarTexture = Instance.new("ImageLabel", progressBar)
+progressBarTexture.Size = UDim2.new(1, 0, 1, 0)
+progressBarTexture.Position = UDim2.new(0, 0, 0, 0)
+progressBarTexture.BackgroundTransparency = 1
+progressBarTexture.Image = "rbxassetid://79082532043261"
+progressBarTexture.ZIndex = 2
+progressBarTexture.ScaleType = Enum.ScaleType.Stretch
+
+local progressTextBorder = Instance.new("TextLabel", progressBarBackground)
+progressTextBorder.Size = UDim2.new(1, 0, 1, 0)
+progressTextBorder.Position = UDim2.new(0, 0, 0, 0)
+progressTextBorder.BackgroundTransparency = 1
+progressTextBorder.TextScaled = true
+progressTextBorder.ZIndex = 2
+progressTextBorder.Font = Enum.Font.FredokaOne
+progressTextBorder.TextColor3 = Color3.fromRGB(0, 0, 0)
+progressTextBorder.TextStrokeTransparency = 0
+progressTextBorder.Text = "0"
+
+local progressText = Instance.new("TextLabel", progressBarBackground)
+progressText.Size = UDim2.new(1, 0, 1, 0)
+progressText.Position = UDim2.new(0, 0, 0, 0)
+progressText.BackgroundTransparency = 1
+progressText.TextScaled = true
+progressText.ZIndex = 2
+progressText.Font = Enum.Font.FredokaOne
+progressText.TextColor3 = Color3.fromRGB(255, 255, 255)
+progressText.Text = "0"
+
+local pumpBarBackground = Instance.new("Frame", screenGui)
+pumpBarBackground.Size = UDim2.new(0.5, 0, 0.01, 0)
+pumpBarBackground.Position = UDim2.new(0.25, 0, 0.86, 0)
+pumpBarBackground.BackgroundColor3 = Color3.fromRGB(47, 47, 47)
+pumpBarBackground.BorderSizePixel = 0
+
+local pumpBar = Instance.new("Frame", pumpBarBackground)
+pumpBar.Size = UDim2.new(1, 0, 1, 0)
+pumpBar.Position = UDim2.new(0, 0, 0, 0)
+pumpBar.BackgroundColor3 = Color3.fromRGB(0, 85, 127)
+pumpBar.BorderSizePixel = 0
+
+local function updateProgressBar(currentSize, maxSize)
+	local fillRatio = currentSize / maxSize 
+	progressBar:TweenSize(UDim2.new(fillRatio, 0, 1, 0), "Out", "Sine", 0.1, true)
+	progressText.Text = formatWithCommas(currentSize)
+	progressTextBorder.Text = formatWithCommas(currentSize)
+end
+
+local function updatePumpBar(pumpCount, randomPumps)
+	local pumpRatio = 1 - (pumpCount / randomPumps)
+	pumpBar:TweenSize(UDim2.new(pumpRatio, 0, 1, 0), "Out", "Sine", 0.2, true)
+end
+
+local probTextLabel = Instance.new("TextLabel", screenGui)
+probTextLabel.Size = UDim2.new(0.5, 0, 0.03, 0)
+probTextLabel.Position = UDim2.new(0.25, 0, 0.83, 0)
+probTextLabel.BackgroundTransparency = 1
+probTextLabel.TextScaled = true
+probTextLabel.Font = Enum.Font.Michroma
+probTextLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+probTextLabel.Text = "x2 luck : 1/3"
+
+local function updateProbabilityText(luck)
+	local probability = "x2 luck : 1/" .. tostring(luck)
+	probTextLabel.Text = probability
+end
+
+local function showTempText(text, duration)
+	local borderLabel, textLabel = createTextLabelWithBorder(text)
+
+	local fadeIn = tweenService:Create(textLabel, TweenInfo.new(0.5), {TextTransparency = 0})
+	local fadeOut = tweenService:Create(textLabel, TweenInfo.new(0.5), {TextTransparency = 1})
+	local borderFadeIn = tweenService:Create(borderLabel, TweenInfo.new(0.5), {TextTransparency = 0})
+	local borderFadeOut = tweenService:Create(borderLabel, TweenInfo.new(0.5), {TextTransparency = 1})
+
+	local moveUp = tweenService:Create(textLabel, TweenInfo.new(1), {Position = textLabel.Position - UDim2.new(0, 0, 0.1, 0)})
+	local borderMoveUp = tweenService:Create(borderLabel, TweenInfo.new(1), {Position = borderLabel.Position - UDim2.new(0, 0, 0.1, 0)})
+
+	fadeIn:Play()
+	borderFadeIn:Play()
+	moveUp:Play()
+	borderMoveUp:Play()
+
+	fadeIn.Completed:Wait()
+	wait(duration)
+
+	fadeOut:Play()
+	borderFadeOut:Play()
+	borderLabel:Destroy()
+	textLabel:Destroy()
+end
+
+local function disableJump()
+	humanoid:SetStateEnabled(Enum.HumanoidStateType.Jumping, false)
+end
+
+local function enableJump()
+	humanoid:SetStateEnabled(Enum.HumanoidStateType.Jumping, true)
+end
+
+local function playAnimation(animationTrack)
+	local currentPlayerTrainingSpeed = player:WaitForChild("PlayerStats").TrainingSpeed.Value
+	
+	if currentAnimationTrack then
+		currentAnimationTrack:Stop()
+	end
+
+	humanoid.WalkSpeed = 0
+	disableJump()
+	humanoid.AutoRotate = false
+	animationTrack:Play()
+	animationTrack:AdjustSpeed(currentPlayerTrainingSpeed)
+	currentAnimationTrack = animationTrack
+end
+
+local function releasePlayer()
+	animationActive = false
+	pushUpPos = false
+	pumpCount = 0
+	probTextLabel.Text = "x2 luck : 1/3"
+	updatePumpBar(0, randomPumps)
+	randomPumps = math.random(3, 5)
+	currentAnimationTrack:Stop()
+	humanoid.WalkSpeed = PlayerWalkSpeed
+	enableJump()
+	humanoid.AutoRotate = true
+end
+
+local function sellPlayerSize()
+	local currentSize = player.leaderstats.Size.Value
+	local currentPlayerMaxSize = player:WaitForChild("PlayerStats").MaxSize.Value
+	if currentSize > 0 then
+		
+		local playerCash = player:WaitForChild("PlayerStats").Cash
+		playerCash.Value = playerCash.Value + currentSize
+
+		player.leaderstats.Size.Value = 0
+
+		updateProgressBar(0, currentPlayerMaxSize)
+	else
+		warn("Vous n'avez pas de taille à vendre.")
+	end
+end
+
+progressBarBackground.InputBegan:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 then
+		if animationActive and not pushUpPos then
+			warn("Vous etes en nouvement")
+		else
+			sellPlayerSize()	
+		end
+	end
+end)
+
+character:ScaleTo(PlayerScale)
+
+userInputService.InputBegan:Connect(function(input, gameProcessed)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 and not gameProcessed then
+		
+		local currentPlayerSize = 	player:WaitForChild("leaderstats").Size.Value
+		local currentPlayerMaxSize = player:WaitForChild("PlayerStats").MaxSize.Value
+		local currentPlayerMultiplier = player:WaitForChild("PlayerStats").Multiplier.Value + 6
+		local currentPlayerWalkSpeed = player:WaitForChild("PlayerStats").WalkSpeed.Value
+		local currentPlayerTrainingSpeed = player:WaitForChild("PlayerStats").TrainingSpeed.Value
+		
+		if currentPlayerSize == currentPlayerMaxSize then
+
+			local originalSize = UDim2.new(1, 0, 1, 0)
+			local largerSize = UDim2.new(1.05, 0, 1.05, 0)
+			local originalColor = Color3.fromRGB(255, 255, 255)
+			local redColor = Color3.fromRGB(170, 0, 0)
+
+			local enlargeTween = tweenService:Create(progressText, TweenInfo.new(0.1, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {Size = largerSize})
+			local borderEnlargeTween = tweenService:Create(progressTextBorder, TweenInfo.new(0.15, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {Size = largerSize})
+
+			local shrinkTween = tweenService:Create(progressText, TweenInfo.new(0.2, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {Size = originalSize})
+			local borderShrinkTween = tweenService:Create(progressTextBorder, TweenInfo.new(0.2, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {Size = originalSize})
+
+			local redTween = tweenService:Create(progressText, TweenInfo.new(0.1, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {TextColor3 = redColor})
+			local whiteTween = tweenService:Create(progressText, TweenInfo.new(0.2, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {TextColor3 = originalColor})
+
+			enlargeTween:Play()
+			borderEnlargeTween:Play()
+			redTween:Play()
+
+			enlargeTween.Completed:Wait()
+
+			shrinkTween:Play()
+			borderShrinkTween:Play()
+			whiteTween:Play()
+		end
+		
+		if (not animationActive or pushUpPos) and (currentPlayerSize < currentPlayerMaxSize) then
+	
+			local luck = 3 + (5 * pumpCount)
+			local randomNumber = math.random(1, luck)
+			
+			updateProbabilityText(luck + 5)
+			
+			local addSize = math.random(1 + (currentPlayerSize * .02) + currentPlayerMultiplier , 1 + (currentPlayerSize * .03) + currentPlayerMultiplier)
+			local ephemeralText = ""
+			
+			pushUpPos = false
+			animationActive = true
+			
+			if player.leaderstats.Size.Value + addSize > currentPlayerMaxSize then
+				local subsize = (player.leaderstats.Size.Value + addSize) - currentPlayerMaxSize
+				addSize = addSize - subsize
+			elseif randomNumber == 1 and player.leaderstats.Size.Value + (addSize * 2) > currentPlayerMaxSize then
+				local subsize = (player.leaderstats.Size.Value + (addSize * 2)) - currentPlayerMaxSize
+				addSize = addSize - subsize
+			elseif randomNumber == 1 and player.leaderstats.Size.Value + (addSize * 2) <= currentPlayerMaxSize then
+				addSize = addSize * 2
+			end
+			
+			if randomNumber == 1 then
+
+				local greenTween = tweenService:Create(pumpBar, TweenInfo.new(0.1, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {BackgroundColor3 = Color3.fromRGB(85, 170, 0)})
+				local blueTween = tweenService:Create(pumpBar, TweenInfo.new(0.5, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {BackgroundColor3 = Color3.fromRGB(0, 85, 127)})
+				greenTween:Play()
+				greenTween.Completed:Wait()
+				blueTween:Play()
+				playAnimation(loadedAnimations.OneArmPushUp)
+				pumpCount = pumpCount + 1
+				ephemeralText = "+" .. formatWithCommas(addSize) .. " [x2]"
+				wait(1.75 / currentPlayerTrainingSpeed)
+			else
+				playAnimation(loadedAnimations.PushUp)
+				pumpCount = pumpCount + 1
+				ephemeralText = "+" .. formatWithCommas(addSize)
+				wait(1.3 / currentPlayerTrainingSpeed)
+			end
+			
+			currentAnimationTrack:AdjustSpeed(0)
+			
+			updatePumpBar(pumpCount, randomPumps)
+			
+			if currentPlayerSize < currentPlayerMaxSize then
+				player.leaderstats.Size.Value = player.leaderstats.Size.Value + addSize
+			end
+			
+			updateProgressBar(player.leaderstats.Size.Value, currentPlayerMaxSize)
+			
+			showTempText(ephemeralText, .05)
+			pushUpPos = true
+			
+			if pumpCount == randomPumps or currentPlayerSize == currentPlayerMaxSize then
+				probTextLabel.Text = "x2 luck : 1/3"
+				releasePlayer()
+				if currentPlayerSize > 5000000 then
+					PlayerScale = (75 + ((currentPlayerSize * .000003)))
+					player.CameraMaxZoomDistance = 500
+				elseif currentPlayerSize > 250000 then
+					PlayerScale = (25 + ((currentPlayerSize * .00001)))
+				else
+					PlayerScale = (0.7 + (currentPlayerSize * .0001))
+				end
+				character:ScaleTo(PlayerScale)
+			end
+		end
+	end
+end)
+
+userInputService.InputBegan:Connect(function(input)
+	if input.KeyCode == Enum.KeyCode.W or input.KeyCode == Enum.KeyCode.A or 
+		input.KeyCode == Enum.KeyCode.S or input.KeyCode == Enum.KeyCode.D or input.KeyCode == Enum.KeyCode.Space then
+		if pushUpPos then
+			releasePlayer()
+		end
+	end
+end)
