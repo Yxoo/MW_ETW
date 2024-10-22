@@ -5,6 +5,12 @@ local userInputService = game:GetService("UserInputService")
 local humanoidRootPart = character:WaitForChild("HumanoidRootPart")
 local tweenService = game:GetService("TweenService")
 
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local playAnimationEvent = ReplicatedStorage:WaitForChild("PlayAnimationEvent")
+local scalePlayerEvent = ReplicatedStorage:WaitForChild("ScalePlayerEvent")
+local releasePlayerEvent = ReplicatedStorage:WaitForChild("ReleasePlayerEvent")
+local addPlayerSizeEvent = ReplicatedStorage:WaitForChild("AddPlayerSizeEvent")
+
 local animations = {
 	PushUp = "89781564914279",
 	OneArmPushUp = "113817629349291"
@@ -21,10 +27,28 @@ local loadedAnimations = {
 	OneArmPushUp = loadAnimation(animations.OneArmPushUp)
 }
 
+local function playAnimationOnServer(animationName)
+	playAnimationEvent:FireServer(animationName)
+end
+
+local function scalePlayerOnServer(scale)
+	scalePlayerEvent:FireServer(scale)
+end
+
+local function releasePlayerOnServer()
+	releasePlayerEvent:FireServer()
+end
+
+local function addSizeOnServer(addSize)
+	addPlayerSizeEvent:FireServer(addSize)
+end
+
 local animationActive = false
 local pushUpPos = false
 local pumpCount = 0
+
 local PlayerScale = 0.7
+
 local randomPumps = math.random(3, 5)
 local currentAnimationTrack = nil
 
@@ -195,19 +219,10 @@ local function enableJump()
 	humanoid:SetStateEnabled(Enum.HumanoidStateType.Jumping, true)
 end
 
-local function playAnimation(animationTrack)
-	local currentPlayerTrainingSpeed = player:WaitForChild("PlayerStats").TrainingSpeed.Value
-	
-	if currentAnimationTrack then
-		currentAnimationTrack:Stop()
-	end
-
+local function playAnimation()
 	humanoid.WalkSpeed = 0
 	disableJump()
 	humanoid.AutoRotate = false
-	animationTrack:Play()
-	animationTrack:AdjustSpeed(currentPlayerTrainingSpeed)
-	currentAnimationTrack = animationTrack
 end
 
 local function releasePlayer()
@@ -217,7 +232,8 @@ local function releasePlayer()
 	probTextLabel.Text = "x2 luck : 1/3"
 	updatePumpBar(0, randomPumps)
 	randomPumps = math.random(3, 5)
-	currentAnimationTrack:Stop()
+	--currentAnimationTrack:Stop()
+	releasePlayerOnServer()
 	humanoid.WalkSpeed = PlayerWalkSpeed
 	enableJump()
 	humanoid.AutoRotate = true
@@ -227,7 +243,7 @@ local function sellPlayerSize()
 	local currentSize = player.leaderstats.Size.Value
 	local currentPlayerMaxSize = player:WaitForChild("PlayerStats").MaxSize.Value
 	if currentSize > 0 then
-		
+
 		local playerCash = player:WaitForChild("PlayerStats").Cash
 		playerCash.Value = playerCash.Value + currentSize
 
@@ -249,17 +265,17 @@ progressBarBackground.InputBegan:Connect(function(input)
 	end
 end)
 
-character:ScaleTo(PlayerScale)
+scalePlayerOnServer(PlayerScale)
 
 userInputService.InputBegan:Connect(function(input, gameProcessed)
 	if input.UserInputType == Enum.UserInputType.MouseButton1 and not gameProcessed then
-		
+
 		local currentPlayerSize = 	player:WaitForChild("leaderstats").Size.Value
-		local currentPlayerMaxSize = player:WaitForChild("PlayerStats").MaxSize.Value
-		local currentPlayerMultiplier = player:WaitForChild("PlayerStats").Multiplier.Value + 6
+		local currentPlayerMaxSize = player:WaitForChild("PlayerStats").MaxSize.Value + 999999999
+		local currentPlayerMultiplier = player:WaitForChild("PlayerStats").Multiplier.Value + 600
 		local currentPlayerWalkSpeed = player:WaitForChild("PlayerStats").WalkSpeed.Value
 		local currentPlayerTrainingSpeed = player:WaitForChild("PlayerStats").TrainingSpeed.Value
-		
+
 		if currentPlayerSize == currentPlayerMaxSize then
 
 			local originalSize = UDim2.new(1, 0, 1, 0)
@@ -286,20 +302,24 @@ userInputService.InputBegan:Connect(function(input, gameProcessed)
 			borderShrinkTween:Play()
 			whiteTween:Play()
 		end
-		
+
 		if (not animationActive or pushUpPos) and (currentPlayerSize < currentPlayerMaxSize) then
-	
+
 			local luck = 3 + (5 * pumpCount)
 			local randomNumber = math.random(1, luck)
-			
+
 			updateProbabilityText(luck + 5)
-			
-			local addSize = math.random(1 + (currentPlayerSize * .02) + currentPlayerMultiplier , 1 + (currentPlayerSize * .03) + currentPlayerMultiplier)
+
+			local addSize = math.random(1 + (currentPlayerSize * .035) + currentPlayerMultiplier , 1 + (currentPlayerSize * .04) + currentPlayerMultiplier)
 			local ephemeralText = ""
-			
+
+			if animationActive then
+				releasePlayerOnServer()
+			end
+
 			pushUpPos = false
 			animationActive = true
-			
+
 			if player.leaderstats.Size.Value + addSize > currentPlayerMaxSize then
 				local subsize = (player.leaderstats.Size.Value + addSize) - currentPlayerMaxSize
 				addSize = addSize - subsize
@@ -309,7 +329,7 @@ userInputService.InputBegan:Connect(function(input, gameProcessed)
 			elseif randomNumber == 1 and player.leaderstats.Size.Value + (addSize * 2) <= currentPlayerMaxSize then
 				addSize = addSize * 2
 			end
-			
+
 			if randomNumber == 1 then
 
 				local greenTween = tweenService:Create(pumpBar, TweenInfo.new(0.1, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {BackgroundColor3 = Color3.fromRGB(85, 170, 0)})
@@ -317,30 +337,32 @@ userInputService.InputBegan:Connect(function(input, gameProcessed)
 				greenTween:Play()
 				greenTween.Completed:Wait()
 				blueTween:Play()
-				playAnimation(loadedAnimations.OneArmPushUp)
+				playAnimationOnServer("OneArmPushUp", currentPlayerTrainingSpeed)
+				playAnimation()
 				pumpCount = pumpCount + 1
 				ephemeralText = "+" .. formatWithCommas(addSize) .. " [x2]"
 				wait(1.75 / currentPlayerTrainingSpeed)
 			else
-				playAnimation(loadedAnimations.PushUp)
+				playAnimationOnServer("PushUp", currentPlayerTrainingSpeed)
+				playAnimation()
 				pumpCount = pumpCount + 1
 				ephemeralText = "+" .. formatWithCommas(addSize)
 				wait(1.3 / currentPlayerTrainingSpeed)
 			end
-			
-			currentAnimationTrack:AdjustSpeed(0)
-			
+
+			--currentAnimationTrack:AdjustSpeed(0)
+
 			updatePumpBar(pumpCount, randomPumps)
-			
+
 			if currentPlayerSize < currentPlayerMaxSize then
-				player.leaderstats.Size.Value = player.leaderstats.Size.Value + addSize
+				addSizeOnServer(addSize)
 			end
-			
+
 			updateProgressBar(player.leaderstats.Size.Value, currentPlayerMaxSize)
-			
+
 			showTempText(ephemeralText, .05)
 			pushUpPos = true
-			
+
 			if pumpCount == randomPumps or currentPlayerSize == currentPlayerMaxSize then
 				probTextLabel.Text = "x2 luck : 1/3"
 				releasePlayer()
@@ -352,7 +374,7 @@ userInputService.InputBegan:Connect(function(input, gameProcessed)
 				else
 					PlayerScale = (0.7 + (currentPlayerSize * .0001))
 				end
-				character:ScaleTo(PlayerScale)
+				scalePlayerOnServer(PlayerScale)
 			end
 		end
 	end
