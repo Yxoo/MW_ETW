@@ -1,0 +1,67 @@
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local playAnimationEvent = ReplicatedStorage:WaitForChild("PlayAnimationEvent")
+local scalePlayerEvent = ReplicatedStorage:WaitForChild("ScalePlayerEvent")
+local releasePlayerEvent = ReplicatedStorage:WaitForChild("ReleasePlayerEvent")
+local addPlayerSizeEvent = ReplicatedStorage:WaitForChild("AddPlayerSizeEvent")
+
+local animationTrack = nil
+
+local animations = {
+	PushUp = "89781564914279",
+	OneArmPushUp = "113817629349291"
+}
+
+local function loadAnimation(animationId, humanoid)
+	local animation = Instance.new("Animation")
+	animation.AnimationId = "rbxassetid://" .. animationId
+	return humanoid:LoadAnimation(animation)
+end
+
+local function playAnimation(animationTrack, currentPlayerTrainingSpeed)
+	if animationTrack then
+		animationTrack:Play()
+		animationTrack:AdjustSpeed(currentPlayerTrainingSpeed)
+	end
+end
+
+-- Pour synchroniser les animations :
+playAnimationEvent.OnServerEvent:Connect(function(player, animationName)
+	local character = player.Character
+	local currentPlayerTrainingSpeed = player:WaitForChild("PlayerStats").TrainingSpeed.Value
+	if character then
+		local humanoid = character:FindFirstChild("Humanoid")
+		if humanoid then
+			if animationName == "PushUp" then
+				animationTrack = loadAnimation(animations.PushUp, humanoid)
+				playAnimation(animationTrack)
+				wait(1.3 / currentPlayerTrainingSpeed, currentPlayerTrainingSpeed)
+			else --animationName == "OneArmPushUp" then
+				animationTrack = loadAnimation(animations.OneArmPushUp, humanoid)
+				playAnimation(animationTrack)
+				wait(1.75 / currentPlayerTrainingSpeed, currentPlayerTrainingSpeed)
+			end
+			animationTrack:AdjustSpeed(0)
+		end
+	end
+end)
+
+-- Pour synchroniser le scale :
+scalePlayerEvent.OnServerEvent:Connect(function(player, scale)
+	local character = player.Character
+	if character then
+		character:ScaleTo(scale)  -- Applique le scale à tous les joueurs
+	end
+end)
+
+releasePlayerEvent.OnServerEvent:Connect(function(player)
+	if animationTrack then
+		animationTrack:Stop()	
+	end
+	animationTrack = nil
+end)
+
+
+addPlayerSizeEvent.OnServerEvent:Connect(function(player, addSize)
+	print(addSize)
+	player.leaderstats.Size.Value = player.leaderstats.Size.Value + addSize
+end)
